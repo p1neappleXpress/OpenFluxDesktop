@@ -14,20 +14,18 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import openfluxdesktop.shared.generated.resources.Res
+import openfluxdesktop.shared.generated.resources.cups
 import openfluxdesktop.shared.generated.resources.max_msg
 import openfluxdesktop.shared.generated.resources.yandex_docs
 import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.painterResource
 import tech.p1neapplexpress.openfluxdesktop.FluxColors
-import tech.p1neapplexpress.openfluxdesktop.data.ConnectionStats
-import tech.p1neapplexpress.openfluxdesktop.ui.Destination
 import tech.p1neapplexpress.openfluxdesktop.data.TransportType
 import tech.p1neapplexpress.openfluxdesktop.fluxMaterialTheme
 import tech.p1neapplexpress.openfluxdesktop.ui.views.BackButton
 
 @Composable
 fun TransportScreen(navigationHandler: (Destination) -> Unit) {
-    val dialogVisible = remember { mutableStateOf(false) }
     val selectedTransport = remember { mutableStateOf<TransportType?>(null) }
 
     Column(
@@ -52,12 +50,11 @@ fun TransportScreen(navigationHandler: (Destination) -> Unit) {
                 letterSpacing = 1.sp
             )
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(24.dp))
 
-            // Transport cards
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 TransportCard(
                     modifier = Modifier.weight(1f),
@@ -73,12 +70,36 @@ fun TransportScreen(navigationHandler: (Destination) -> Unit) {
 
                 TransportCard(
                     modifier = Modifier.weight(1f),
-                    title = "MAX Messenger",
+                    title = "Volga",
+                    icon = Res.drawable.yandex_docs,
+                    onClick = {
+                        selectedTransport.value = TransportType.VYANDEX
+                        navigationHandler.invoke(
+                            Destination.ConnectionConfig(TransportType.VYANDEX.name)
+                        )
+                    }
+                )
+
+                TransportCard(
+                    modifier = Modifier.weight(1f),
+                    title = "MAX",
                     icon = Res.drawable.max_msg,
                     onClick = {
                         selectedTransport.value = TransportType.ONEME
                         navigationHandler.invoke(
                             Destination.ConnectionConfig(TransportType.ONEME.name)
+                        )
+                    }
+                )
+
+                TransportCard(
+                    modifier = Modifier.weight(1f),
+                    title = "Cups",
+                    icon = Res.drawable.cups,
+                    onClick = {
+                        selectedTransport.value = TransportType.CUPSONLINE
+                        navigationHandler.invoke(
+                            Destination.ConnectionConfig(TransportType.CUPSONLINE.name)
                         )
                     }
                 )
@@ -95,8 +116,7 @@ private fun TransportCard(
     onClick: () -> Unit
 ) {
     Card(
-        modifier = modifier
-            .height(150.dp),
+        modifier = modifier.height(140.dp),
         onClick = onClick,
         colors = CardDefaults.cardColors(
             containerColor = FluxColors.background.copy(alpha = 0.7f)
@@ -104,21 +124,21 @@ private fun TransportCard(
         border = androidx.compose.foundation.BorderStroke(1.dp, FluxColors.white.copy(alpha = 0.3f))
     ) {
         Column(
-            modifier = Modifier.fillMaxSize().padding(16.dp),
+            modifier = Modifier.fillMaxSize().padding(12.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
             Icon(
-                modifier = Modifier.size(64.dp),
+                modifier = Modifier.size(56.dp),
                 tint = Color.Unspecified,
                 painter = painterResource(icon),
                 contentDescription = title
             )
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(10.dp))
             Text(
                 text = title,
                 color = FluxColors.white,
-                fontSize = 14.sp,
+                fontSize = 12.sp,
                 textAlign = TextAlign.Center
             )
         }

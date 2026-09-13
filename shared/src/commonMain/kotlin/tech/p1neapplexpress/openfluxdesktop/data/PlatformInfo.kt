@@ -8,14 +8,14 @@ object PlatformInfo {
     val arch: String = detectArch()
 
     val binaryName: String
-        get() = "universal-bypass-tool-$os-$arch"
+        get() = "openflux-$os-$arch"
 
     val binaryExtension: String
         get() = if (os == "windows") ".exe" else ""
 
     val binDir: File
         get() {
-            val workDir = System.getProperty("user.dir")
+            val workDir = System.getProperty("user.dir") ?: "."
             return File(workDir, "bin").apply { mkdirs() }
         }
 
