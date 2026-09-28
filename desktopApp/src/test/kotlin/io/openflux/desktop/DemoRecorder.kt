@@ -16,7 +16,10 @@ import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.runSkikoComposeUiTest
 import androidx.compose.ui.unit.Density
-import io.openflux.desktop.data.JvmShareLinkCodec
+import io.openflux.desktop.core.CliCoreLinks
+import io.openflux.desktop.core.CoreBinary
+import io.openflux.desktop.model.CoreShareLinkCodec
+import io.openflux.desktop.model.ShareLinkCodec
 import io.openflux.desktop.model.AppSettings
 import io.openflux.desktop.model.CaptchaPrompt
 import io.openflux.desktop.model.ConnectionMode
@@ -269,8 +272,10 @@ class DemoRecorder {
         val settings = DemoSettings(kind)
         val connection = DemoConnection()
         val platform = DemoPlatform(kind)
-        val container = AppContainer(profiles, settings, connection, platform, JvmShareLinkCodec(), DemoNode())
-        val link = JvmShareLinkCodec().encode(
+        // Links are the core's: the demo runs the bundled one.
+        val codec = CoreShareLinkCodec(CliCoreLinks(settings, CoreBinary()))
+        val container = AppContainer(profiles, settings, connection, platform, codec, DemoNode(codec))
+        val link = kotlinx.coroutines.runBlocking { codec.encode(
             ShareConfig(
                 name = "Нода Франкфурт", negotiate = true, secret = "5f".repeat(32),
                 context = "https://docs.yandex.ru/edit/d/demoFrankfurtDocument0123456789",
@@ -279,7 +284,7 @@ class DemoRecorder {
                     ShareTransport(type = "direct", dial = "198.51.100.24:31337", priority = 50),
                 ),
             ),
-        )
+        ) }
     }
 
     private class DemoSettings(kind: PlatformKind) : SettingsRepository {
@@ -376,8 +381,10 @@ class DemoRecorder {
         override fun shutdown() = Unit
     }
 
-    private class DemoNode : NodeWizardService {
-        private val codec = JvmShareLinkCodec()
+    private class DemoNode(private val codec: ShareLinkCodec) : NodeWizardService {
+        override val logs = MutableStateFlow<List<LogLine>>(emptyList())
+        override fun clearLogs() { logs.value = emptyList() }
+        override fun note(text: String, level: LogLevel) = Unit
 
         override suspend fun connect(target: SshTarget): ServerProbe {
             if (target.hostKey.isEmpty()) {
