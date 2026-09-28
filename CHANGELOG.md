@@ -3,7 +3,23 @@
 All notable changes to OpenFluxDesktop. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [2.1.0] - 2026-09-28
+
+### Changed
+
+- Share links are read and made by the core, the way every client does:
+  bumps `OpenFlux` to [`2ec01a5`](https://github.com/p1neappleXpress/OpenFlux/commit/2ec01a5) (core 0.2.0) and `shared` to
+  [`6bd877b`](https://github.com/p1neappleXpress/OpenFluxClientShared/commit/6bd877b).
+  - A link that picked up line breaks, spaces, non-breaking or zero-width
+    characters, padding or the standard base64 alphabet on the way imports,
+    as on iOS, instead of «Ссылка повреждена».
+  - The same profile makes the same link on Desktop, Android and iOS; the
+    core names the encryption context of a Session link, the app no longer
+    derives it.
+  - A refused link says why: not a link, cut short, letters changed case,
+    unknown transport, key too short, and so on.
+  - The node wizard installs `node-v1.1.0`, the node build of core 0.2.0.
+- The release notes show this changelog.
 
 ### Fixed
 
@@ -18,9 +34,6 @@ All notable changes to OpenFluxDesktop. Format loosely follows
     (classic cups.online was the common case).
   - The classic codec (batched or legacy) is no longer a hard requirement:
     both are accepted and the client switches when the node does not answer.
-  - Share links are read the same way as on every client: wrapped lines,
-    padding and the standard base64 alphabet are accepted, and the key
-    length is counted in characters.
   - boards no longer drops the connection every 20 seconds; yandex and
     mailru reconnect when their socket dies.
   - The log explains a failed handshake: wrong key, a node in the other

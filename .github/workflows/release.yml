@@ -202,6 +202,28 @@ jobs:
       - name: Checksums
         run: cd dist && sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt
 
+      # The release shows its CHANGELOG.md section, then which file is for
+      # which system.
+      - name: Notes
+        env:
+          tag: ${{ steps.tag.outputs.name }}
+        run: |
+          awk -v v="${tag#v}" 'index($0, "## [")==1 { if (f) exit; f = (index($0, "## [" v "]") == 1); next } f' CHANGELOG.md > notes.md
+          cat >> notes.md <<'TABLE'
+
+          | Система | Файл |
+          |---|---|
+          | **Windows** 10/11 x64 | `.msi` или `-setup.exe` (установка), `-portable.zip` (без установки, запуск `OpenFlux.exe`) |
+          | **Linux** x64 | `.deb` (Debian, Ubuntu, Mint) или `.tar.gz` (запуск `OpenFlux/bin/OpenFlux`) |
+          | **macOS** | `-macos-arm64.dmg` (Apple Silicon) или `-macos-x64.dmg` (Intel) |
+
+          - Встроенный браузер для входа в Яндекс и проверок (~230 МБ) скачивается при первом использовании.
+          - Системный прокси и режим «Весь трафик компьютера» пока только в Windows; на Linux и macOS программы подключаются к SOCKS5 `127.0.0.1:1080` или HTTP `127.0.0.1:1081`.
+          - Сборки для macOS не подписаны: при первом запуске откройте приложение через правый клик → «Открыть».
+          - Контрольные суммы — в `SHA256SUMS.txt`.
+          TABLE
+          cat notes.md
+
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.tag.outputs.name }}
@@ -209,14 +231,4 @@ jobs:
           name: OpenFluxDesktop ${{ steps.tag.outputs.name }}
           generate_release_notes: true
           files: dist/*
-          body: |
-            | Система | Файл |
-            |---|---|
-            | **Windows** 10/11 x64 | `.msi` или `-setup.exe` (установка), `-portable.zip` (без установки, запуск `OpenFlux.exe`) |
-            | **Linux** x64 | `.deb` (Debian, Ubuntu, Mint) или `.tar.gz` (запуск `OpenFlux/bin/OpenFlux`) |
-            | **macOS** | `-macos-arm64.dmg` (Apple Silicon) или `-macos-x64.dmg` (Intel) |
-
-            - Встроенный браузер для входа в Яндекс и проверок (~230 МБ) скачивается при первом использовании.
-            - Системный прокси и режим «Весь трафик компьютера» пока только в Windows; на Linux и macOS программы подключаются к SOCKS5 `127.0.0.1:1080` или HTTP `127.0.0.1:1081`.
-            - Сборки для macOS не подписаны: при первом запуске откройте приложение через правый клик → «Открыть».
-            - Контрольные суммы — в `SHA256SUMS.txt`.
+          body_path: notes.md
