@@ -3,6 +3,30 @@
 All notable changes to OpenFluxDesktop. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Fixed
+
+- Clients and nodes built from different trees now connect: bumps `OpenFlux`
+  to [`f8f3476`](https://github.com/p1neappleXpress/OpenFlux/commit/f8f34767a5732febd5965ac6cf95bad51b70cf99).
+  - A classic profile with a key runs the Session and falls back to the
+    classic layering for a classic or older node, on the same carrier; a
+    node set up as classic serves both kinds of client. Nodes set up for
+    the Session stay Session-only.
+  - The encryption context follows one rule everywhere, and a client whose
+    context differs from the node's finds the node's instead of timing out
+    (classic cups.online was the common case).
+  - The classic codec (batched or legacy) is no longer a hard requirement:
+    both are accepted and the client switches when the node does not answer.
+  - Share links are read the same way as on every client: wrapped lines,
+    padding and the standard base64 alphabet are accepted, and the key
+    length is counted in characters.
+  - boards no longer drops the connection every 20 seconds; yandex and
+    mailru reconnect when their socket dies.
+  - The log explains a failed handshake: wrong key, a node in the other
+    mode, the codec or context picked, a connection taken over by another
+    client.
+
 ## [2.0.2] - 2026-09-27
 
 ### Fixed
