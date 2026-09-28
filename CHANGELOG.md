@@ -5,11 +5,19 @@ All notable changes to OpenFluxDesktop. Format loosely follows
 
 ## [2.1.0] - 2026-09-28
 
+### Added
+
+- A classic profile runs as the exit node: the same l4 exit a Session
+  profile starts, with the profile's transport, codec, document and key,
+  serving its classic clients and Session clients alike; the link for
+  clients shows on the home card. Exit mode no longer demands a Session
+  profile.
+
 ### Changed
 
 - Share links are read and made by the core, the way every client does:
   bumps `OpenFlux` to [`2ec01a5`](https://github.com/p1neappleXpress/OpenFlux/commit/2ec01a5) (core 0.2.0) and `shared` to
-  [`6bd877b`](https://github.com/p1neappleXpress/OpenFluxClientShared/commit/6bd877b).
+  [`ae5e59a`](https://github.com/p1neappleXpress/OpenFluxClientShared/commit/ae5e59a).
   - A link that picked up line breaks, spaces, non-breaking or zero-width
     characters, padding or the standard base64 alphabet on the way imports,
     as on iOS, instead of «Ссылка повреждена».
@@ -19,6 +27,8 @@ All notable changes to OpenFluxDesktop. Format loosely follows
   - A refused link says why: not a link, cut short, letters changed case,
     unknown transport, key too short, and so on.
   - The node wizard installs `node-v1.1.0`, the node build of core 0.2.0.
+- The node wizard's document step takes the link of a document you
+  created; the button that signed in to Yandex and created one is gone.
 - The release notes show this changelog.
 
 ### Fixed
