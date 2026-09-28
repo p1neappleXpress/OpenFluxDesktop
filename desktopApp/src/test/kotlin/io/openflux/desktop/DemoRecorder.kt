@@ -243,9 +243,10 @@ class DemoRecorder {
             type("Пароль", "••••••••")
             tap("Подключиться", after = 4)
             tap("Доверять", after = 2)
-            until { runCatching { node("Войти в Яндекс") }.isSuccess }
+            until { runCatching { node("Проверить ссылку") }.isSuccess }
             hold(6)
-            tap("Войти в Яндекс и создать документ", after = 2)
+            type("Ссылка с доступом", "https://docs.yandex.ru/edit/d/demoNewNodeDocument01234567890")
+            tap("Проверить ссылку", after = 2)
             until { runCatching { node("Установить ноду") }.isSuccess }
             hold(10)
             tap("Установить ноду", after = 2)
