@@ -30,8 +30,13 @@ import io.openflux.desktop.model.LogLevel
 import io.openflux.desktop.model.LogLine
 import io.openflux.desktop.model.NewChannel
 import io.openflux.desktop.model.NodePlan
+import io.openflux.desktop.model.NodeTransport
 import io.openflux.desktop.model.NodeWizardException
 import io.openflux.desktop.model.Profile
+import io.openflux.desktop.data.FileAccountRepository
+import io.openflux.desktop.data.HttpSessionProbe
+import io.openflux.desktop.service.Accounts
+import io.openflux.desktop.web.KcefAccountBrowser
 import io.openflux.desktop.model.ProfileSource
 import io.openflux.desktop.model.ServerProbe
 import io.openflux.desktop.model.ShareConfig
@@ -275,7 +280,12 @@ class DemoRecorder {
         val platform = DemoPlatform(kind)
         // Links are the core's: the demo runs the bundled one.
         val codec = CoreShareLinkCodec(CliCoreLinks(settings, CoreBinary()))
-        val container = AppContainer(profiles, settings, connection, platform, codec, DemoNode(codec))
+        val accounts = Accounts(
+            FileAccountRepository(java.nio.file.Files.createTempDirectory("demo-accounts").toFile()),
+            KcefAccountBrowser(), HttpSessionProbe(), System::currentTimeMillis,
+            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Default),
+        )
+        val container = AppContainer(profiles, settings, connection, platform, codec, DemoNode(codec), accounts)
         val link = kotlinx.coroutines.runBlocking { codec.encode(
             ShareConfig(
                 name = "Нода Франкфурт", negotiate = true, secret = "5f".repeat(32),
@@ -397,7 +407,7 @@ class DemoRecorder {
 
         override suspend fun newChannel() = NewChannel("of-k3f9q2", "c3".repeat(32))
 
-        override suspend fun plan(channel: String, withCookies: Boolean): NodePlan {
+        override suspend fun plan(channel: String, transports: List<NodeTransport>, withCookies: Boolean, autoUpdate: Boolean): NodePlan {
             Thread.sleep(600)
             return NodePlan(
                 channel = channel, port = 31337,
@@ -410,21 +420,29 @@ class DemoRecorder {
             )
         }
 
-        override suspend fun apply(channel: NewChannel, documentUrl: String, port: Int, sudoPassword: String, cookieHeader: String) {
+        override suspend fun apply(
+            channel: NewChannel,
+            transports: List<NodeTransport>,
+            port: Int,
+            autoUpdate: Boolean,
+            sudoPassword: String,
+            cookieHeader: String,
+        ) {
             Thread.sleep(1500)
         }
+
+        override suspend fun createCupsRooms() = "WyJyb29tLTEiXQ"
 
         override suspend fun remove(channel: String, sudoPassword: String) = Unit
         override suspend fun checkDocument(documentUrl: String) { Thread.sleep(400) }
 
-        override suspend fun shareLink(name: String, documentUrl: String, key: String, host: String, port: Int) =
+        override suspend fun shareLink(name: String, key: String, host: String, port: Int, transports: List<NodeTransport>) =
             codec.encode(
                 ShareConfig(
-                    name = name, negotiate = true, secret = key, context = documentUrl,
-                    transports = listOf(
-                        ShareTransport(type = "vyandex", url = documentUrl, priority = 100),
+                    name = name, negotiate = true, secret = key,
+                    context = transports.firstOrNull { it.type != "cupsonline" }?.url ?: "http://#",
+                    transports = transports.mapIndexed { i, t -> ShareTransport(type = t.type, url = t.url, priority = 100 - 10 * i) } +
                         ShareTransport(type = "direct", dial = "$host:$port", priority = 50),
-                    ),
                 ),
             )
 
