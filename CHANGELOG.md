@@ -17,14 +17,6 @@ All notable changes to OpenFluxDesktop. Format loosely follows
   6 hours, verifies it against the release's `node-install.sh` and
   `SHA256SUMS`, restarts the channels and rolls back if one does not stay
   up. Works on any systemd distribution.
-
-### Removed
-
-- The node wizard no longer hands the node a Yandex sign-in (it had no way
-  in from the UI since the document step takes your own link).
-
-### Added
-
 - macOS: «Весь трафик компьютера (TUN)», the core's utun client (as the
   Wintun full tunnel on Windows). The core needs root: on each connect
   macOS asks for an administrator's password; OpenFlux itself runs as a
@@ -53,6 +45,11 @@ All notable changes to OpenFluxDesktop. Format loosely follows
   `shared` to [`a8bd71e`](https://github.com/p1neappleXpress/OpenFluxClientShared/commit/a8bd71e).
 - A classic profile in the full tunnel shows as connected once the tunnel
   is up.
+
+### Removed
+
+- The node wizard no longer hands the node a Yandex sign-in (it had no way
+  in from the UI since the document step takes your own link).
 
 ## [2.1.0] - 2026-09-28
 
