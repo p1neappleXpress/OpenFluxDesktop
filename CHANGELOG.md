@@ -29,10 +29,17 @@ All notable changes to OpenFluxDesktop. Format loosely follows
 
 ### Changed
 
+- The node wizard no longer signs in to Yandex: the document step takes
+  the link of a document you created, and the node gets no account
+  cookies. Solving a captcha on the client, or for a node through the
+  client, works as before.
 - The core also brings, from its main branch:
   - the node wizard installs nodes with the new `node-install.sh` (still
-    `node-v1.1.0`); it can keep a node updated by itself, off unless
-    turned on on the server (`node-install.sh autoupdate on`);
+    `node-v1.1.0`), tested on Ubuntu 20.04–24.04, Debian 12–13, Rocky 9,
+    Alma 8, Fedora 42, Arch and openSUSE Leap 15.6. On the server,
+    `sudo sh /opt/openflux-node/node-install.sh list` shows the channels,
+    `remove <channel>` deletes one and `uninstall` removes the node
+    completely (channels, core, updater, user);
   - a Windows exit in `l3` mode works (WinDivert), for nodes run by hand;
   - the Go module is `github.com/p1neappleXpress/OpenFlux`.
 
