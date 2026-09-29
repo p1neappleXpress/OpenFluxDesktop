@@ -3,6 +3,26 @@
 All notable changes to OpenFluxDesktop. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+
+- macOS: «Весь трафик компьютера (TUN)», the core's utun client (as the
+  Wintun full tunnel on Windows). The core needs root: on each connect
+  macOS asks for an administrator's password; OpenFlux itself runs as a
+  normal app. Disconnecting, quitting or a crash of OpenFlux stops the
+  root core, which puts the routes back.
+
+### Fixed
+
+- The speed and traffic counters work for classic profiles too, not only
+  Session ones: bumps `OpenFlux` to
+  [`3bf44de`](https://github.com/p1neappleXpress/OpenFlux/commit/3bf44de) (the core reports
+  traffic over IPC without a Session, and MAX counts its bytes) and
+  `shared` to [`b0d33ab`](https://github.com/p1neappleXpress/OpenFluxClientShared/commit/b0d33ab).
+- A classic profile in the full tunnel shows as connected once the tunnel
+  is up.
+
 ## [2.1.0] - 2026-09-28
 
 ### Added
