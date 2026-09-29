@@ -12,6 +12,10 @@ All notable changes to OpenFluxDesktop. Format loosely follows
   macOS asks for an administrator's password; OpenFlux itself runs as a
   normal app. Disconnecting, quitting or a crash of OpenFlux stops the
   root core, which puts the routes back.
+- Windows: the full tunnel no longer needs OpenFlux restarted as
+  administrator. On each connect Windows asks for permission (UAC) for the
+  core alone; disconnecting, quitting or a crash of OpenFlux ends it, and
+  the Wintun adapter goes with its routes.
 
 ### Fixed
 
@@ -19,7 +23,7 @@ All notable changes to OpenFluxDesktop. Format loosely follows
   Session ones: bumps `OpenFlux` to
   [`3bf44de`](https://github.com/p1neappleXpress/OpenFlux/commit/3bf44de) (the core reports
   traffic over IPC without a Session, and MAX counts its bytes) and
-  `shared` to [`b0d33ab`](https://github.com/p1neappleXpress/OpenFluxClientShared/commit/b0d33ab).
+  `shared` to [`f86f4d8`](https://github.com/p1neappleXpress/OpenFluxClientShared/commit/f86f4d8).
 - A classic profile in the full tunnel shows as connected once the tunnel
   is up.
 
