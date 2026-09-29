@@ -23,7 +23,7 @@ All notable changes to OpenFluxDesktop. Format loosely follows
   Session ones: bumps `OpenFlux` to
   [`3bf44de`](https://github.com/p1neappleXpress/OpenFlux/commit/3bf44de) (the core reports
   traffic over IPC without a Session, and MAX counts its bytes) and
-  `shared` to [`f86f4d8`](https://github.com/p1neappleXpress/OpenFluxClientShared/commit/f86f4d8).
+  `shared` to [`aada88b`](https://github.com/p1neappleXpress/OpenFluxClientShared/commit/aada88b).
 - A classic profile in the full tunnel shows as connected once the tunnel
   is up.
 
