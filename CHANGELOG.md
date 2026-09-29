@@ -7,6 +7,24 @@ All notable changes to OpenFluxDesktop. Format loosely follows
 
 ### Added
 
+- «Своя нода»: a new channel is no longer Yandex-only. The transports step
+  takes any mix of a Yandex document (your own link), a Mail.ru public
+  document and cups.online rooms (created automatically), with direct
+  always on as the backup; the link and the saved profile carry all of
+  them.
+- «Автообновление ядра» on the plan step (on by default): the server's
+  `openflux-node-update.timer` checks the newest `node-v*` release every
+  6 hours, verifies it against the release's `node-install.sh` and
+  `SHA256SUMS`, restarts the channels and rolls back if one does not stay
+  up. Works on any systemd distribution.
+
+### Removed
+
+- The node wizard no longer hands the node a Yandex sign-in (it had no way
+  in from the UI since the document step takes your own link).
+
+### Added
+
 - macOS: «Весь трафик компьютера (TUN)», the core's utun client (as the
   Wintun full tunnel on Windows). The core needs root: on each connect
   macOS asks for an administrator's password; OpenFlux itself runs as a

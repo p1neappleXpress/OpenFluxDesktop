@@ -30,6 +30,7 @@ import io.openflux.desktop.model.LogLevel
 import io.openflux.desktop.model.LogLine
 import io.openflux.desktop.model.NewChannel
 import io.openflux.desktop.model.NodePlan
+import io.openflux.desktop.model.NodeTransport
 import io.openflux.desktop.model.NodeWizardException
 import io.openflux.desktop.model.Profile
 import io.openflux.desktop.model.ProfileSource
@@ -40,7 +41,6 @@ import io.openflux.desktop.model.SshTarget
 import io.openflux.desktop.model.ThemeMode
 import io.openflux.desktop.model.TrafficStats
 import io.openflux.desktop.model.TransportType
-import io.openflux.desktop.model.YandexDocument
 import io.openflux.desktop.platform.JvmPlatformServices
 import io.openflux.desktop.service.AppContainer
 import io.openflux.desktop.service.ConnectionService
@@ -397,12 +397,12 @@ class DemoRecorder {
 
         override suspend fun newChannel() = NewChannel("of-k3f9q2", "c3".repeat(32))
 
-        override suspend fun plan(channel: String, withCookies: Boolean): NodePlan {
+        override suspend fun plan(channel: String, transports: List<NodeTransport>, autoUpdate: Boolean): NodePlan {
             Thread.sleep(600)
             return NodePlan(
                 channel = channel, port = 31337,
                 actions = listOf(
-                    "Скачать ядро OpenFlux node-v1.4.0 и сверить SHA-256",
+                    "Скачать ядро OpenFlux node-v1.1.0 и сверить SHA-256",
                     "Создать канал $channel: документ, ключ, порт 31337",
                     "Запустить systemd-сервис openflux-node@$channel",
                     "Открыть порт 31337/tcp для резервного канала",
@@ -410,34 +410,26 @@ class DemoRecorder {
             )
         }
 
-        override suspend fun apply(channel: NewChannel, documentUrl: String, port: Int, sudoPassword: String, cookieHeader: String) {
+        override suspend fun apply(channel: NewChannel, transports: List<NodeTransport>, port: Int, autoUpdate: Boolean, sudoPassword: String) {
             Thread.sleep(1500)
         }
 
         override suspend fun remove(channel: String, sudoPassword: String) = Unit
         override suspend fun checkDocument(documentUrl: String) { Thread.sleep(400) }
 
-        override suspend fun shareLink(name: String, documentUrl: String, key: String, host: String, port: Int) =
+        override suspend fun createCupsRooms() = "WyJyb29tLTEiXQ"
+
+        override suspend fun shareLink(name: String, key: String, host: String, port: Int, transports: List<NodeTransport>) =
             codec.encode(
                 ShareConfig(
-                    name = name, negotiate = true, secret = key, context = documentUrl,
-                    transports = listOf(
-                        ShareTransport(type = "vyandex", url = documentUrl, priority = 100),
+                    name = name, negotiate = true, secret = key,
+                    context = transports.firstOrNull { it.type != "cupsonline" }?.url ?: "http://#",
+                    transports = transports.mapIndexed { i, t -> ShareTransport(type = t.type, url = t.url, priority = 100 - 10 * i) } +
                         ShareTransport(type = "direct", dial = "$host:$port", priority = 50),
-                    ),
                 ),
             )
 
         override suspend fun resolve(host: String) = setOf(host)
-        override val documentPage: StateFlow<BrowserPage?> = MutableStateFlow(null)
-
-        override suspend fun createDocument(fileName: String, onStep: (String) -> Unit): YandexDocument {
-            onStep("Создаю документ на Яндекс Диске…")
-            Thread.sleep(900)
-            return YandexDocument("https://docs.yandex.ru/edit/d/demoNewNodeDocument01234567890", "Session_id=demo; yandexuid=1")
-        }
-
-        override fun cancelDocument() = Unit
         override fun close() = Unit
     }
 
