@@ -17,13 +17,22 @@ All notable changes to OpenFluxDesktop. Format loosely follows
   core alone; disconnecting, quitting or a crash of OpenFlux ends it, and
   the Wintun adapter goes with its routes.
 
+### Changed
+
+- The core also brings, from its main branch:
+  - the node wizard installs nodes with the new `node-install.sh` (still
+    `node-v1.1.0`); it can keep a node updated by itself, off unless
+    turned on on the server (`node-install.sh autoupdate on`);
+  - a Windows exit in `l3` mode works (WinDivert), for nodes run by hand;
+  - the Go module is `github.com/p1neappleXpress/OpenFlux`.
+
 ### Fixed
 
 - The speed and traffic counters work for classic profiles too, not only
   Session ones: bumps `OpenFlux` to
-  [`3bf44de`](https://github.com/p1neappleXpress/OpenFlux/commit/3bf44de) (the core reports
+  [`96a0f95`](https://github.com/p1neappleXpress/OpenFlux/commit/96a0f95) (the core reports
   traffic over IPC without a Session, and MAX counts its bytes) and
-  `shared` to [`aada88b`](https://github.com/p1neappleXpress/OpenFluxClientShared/commit/aada88b).
+  `shared` to [`a8bd71e`](https://github.com/p1neappleXpress/OpenFluxClientShared/commit/a8bd71e).
 - A classic profile in the full tunnel shows as connected once the tunnel
   is up.
 
