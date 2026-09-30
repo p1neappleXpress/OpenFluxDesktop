@@ -59,7 +59,7 @@ fun main(args: Array<String>) {
 
     val container = createAppContainer(APP_VERSION)
     val stopped = AtomicBoolean(false)
-    val stop = { if (stopped.compareAndSet(false, true)) container.connection.shutdown() }
+    val stop = { if (stopped.compareAndSet(false, true)) { container.connection.shutdown(); container.phpHosting.close() } }
     // The core and the Windows proxy must not outlive the app, even on logoff or a kill from the task manager.
     Runtime.getRuntime().addShutdownHook(Thread({ stop() }, "openflux-shutdown"))
 

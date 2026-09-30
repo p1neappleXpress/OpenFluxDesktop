@@ -7,6 +7,18 @@ All notable changes to OpenFluxDesktop. Format loosely follows
 
 ### Added
 
+- «Без сервера»: a new profile mode where the exit is a small PHP program on an
+  ordinary web hosting (free or paid, any with PHP and FTP/FTPS) instead of your
+  own server. The wizard (Профили → «Без сервера») takes the FTP data and the
+  site's address, creates a cups.online room (or takes a Mail.ru document),
+  uploads the node, checks that the site runs it, starts it and connects through
+  it before saving the profile. Works as proxies or as the full tunnel (TUN);
+  no key to keep, TCP on ports 80 and 443 only. The node renews itself while it
+  is used, and connecting a profile made this way first asks its node to run
+  when the hosting is reachable; the profile page has Start/Stop for it. Its
+  `openflux://` link and QR carry the mode (never the node's token) and are made
+  by the core. The same mode on the profile editor, import and share dialogs.
+
 - «Своя нода»: a new channel is no longer Yandex-only. The transports step
   takes any mix of a Yandex document (your own link), a Mail.ru public
   document and cups.online rooms (created automatically), with direct
