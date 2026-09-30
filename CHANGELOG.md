@@ -5,6 +5,8 @@ All notable changes to OpenFluxDesktop. Format loosely follows
 
 ## [Unreleased]
 
+## [2.2.0] - 2026-10-01
+
 ### Added
 
 - «Без сервера»: a new profile mode where the exit is a small PHP program on an
