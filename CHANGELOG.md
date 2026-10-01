@@ -7,15 +7,25 @@ All notable changes to OpenFluxDesktop. Format loosely follows
 
 ## [2.2.0] - 2026-10-01
 
+### Added
+
+- «Без сервера» wizard: a node already on the hosting (uploaded by hand or from
+  another device) can be added from its site and access key, without FTP — paste
+  the node's page address and the key, channel and room/document fill themselves.
+  An FTP install takes an optional key of your own. «Панель ноды» opens the
+  node's own page in the browser, and the profile shows which generation serves
+  now («работает · поколение N · смена через N с»). The access key is shown and
+  copied from the profile.
+
 ### Fixed
 
 - «Без сервера»: the node now stays up on any host and keeps the tunnel going
-  across its generations, and a proxy profile connects on macOS. Bumps
-  `OpenFlux` to [`acac97b`](https://github.com/p1neappleXpress/OpenFlux/commit/acac97b)
-  (the node survives a host's CPU, wall-clock and disabled-function limits, hands
-  over early and consistently, and `--mode=stream` is SOCKS5 again without root)
-  and `shared` to [`18ee37c`](https://github.com/p1neappleXpress/OpenFluxClientShared/commit/18ee37c)
-  (a stream proxy profile names `--inbound=socks5`).
+  across its generations, and a proxy profile connects on macOS. The install no
+  longer fails when the host cuts a transfer short (InfinityFree's FTP aborted
+  the link parser part way): a file is sent again, and `auto` goes on in plain
+  FTP after it keeps failing over TLS. Bumps `OpenFlux` to
+  [`d245db7`](https://github.com/p1neappleXpress/OpenFlux/commit/d245db7) and
+  `shared` to [`98572e2`](https://github.com/p1neappleXpress/OpenFluxClientShared/commit/98572e2).
 
 ### Added
 
