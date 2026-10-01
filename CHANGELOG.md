@@ -7,6 +7,16 @@ All notable changes to OpenFluxDesktop. Format loosely follows
 
 ## [2.2.0] - 2026-10-01
 
+### Fixed
+
+- «Без сервера»: the node now stays up on any host and keeps the tunnel going
+  across its generations, and a proxy profile connects on macOS. Bumps
+  `OpenFlux` to [`acac97b`](https://github.com/p1neappleXpress/OpenFlux/commit/acac97b)
+  (the node survives a host's CPU, wall-clock and disabled-function limits, hands
+  over early and consistently, and `--mode=stream` is SOCKS5 again without root)
+  and `shared` to [`18ee37c`](https://github.com/p1neappleXpress/OpenFluxClientShared/commit/18ee37c)
+  (a stream proxy profile names `--inbound=socks5`).
+
 ### Added
 
 - «Без сервера»: a new profile mode where the exit is a small PHP program on an
