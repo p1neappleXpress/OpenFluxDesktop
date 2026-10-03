@@ -62,6 +62,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       value: ${{ steps.version.outputs.value }}
+      numeric: ${{ steps.version.outputs.numeric }}
       tag: ${{ steps.version.outputs.tag }}
       date: ${{ steps.version.outputs.date }}
     steps:
@@ -81,6 +82,10 @@ jobs:
           IFS=. read -r major minor patch <<< "$last"
           date=$(date -u +%Y%m%d)
           short=$(git rev-parse --short=7 HEAD)
+          # jpackage (packageMsi/packageExe/packageDmg) rejects anything but
+          # plain MAJOR.MINOR.PATCH, so the nightly suffix can only go on the
+          # display/artifact/tag strings, not on what Gradle packages with.
+          echo "numeric=${major}.${minor}.$((patch + 1))" >> "$GITHUB_OUTPUT"
           echo "value=${major}.${minor}.$((patch + 1))-nightly.${date}" >> "$GITHUB_OUTPUT"
           echo "tag=nightly-${date}-${short}" >> "$GITHUB_OUTPUT"
           echo "date=${date}" >> "$GITHUB_OUTPUT"
@@ -177,7 +182,7 @@ jobs:
 
       - name: Package
         run: |
-          flags="-PappVersion=${{ needs.version.outputs.value }}"
+          flags="-PappVersion=${{ needs.version.outputs.numeric }}"
           [ "${{ matrix.goos }}" = windows ] && flags="$flags -PwindowsPackage=true"
           ./gradlew --no-daemon $flags ${{ matrix.tasks }}
 
