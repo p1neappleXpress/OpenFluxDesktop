@@ -552,7 +552,7 @@ class DemoRecorder {
     }
 
     private class DemoPlatform(override val kind: PlatformKind) : PlatformServices {
-        private val real = JvmPlatformServices("2.5.0") { "main@6d84e01" }
+        private val real = JvmPlatformServices("2.5.0", CoreBinary()) { "main@6d84e01" }
         override val appVersion = "2.5.0"
         override val coreVersion = "main@6d84e01"
         override val clientRepo = "p1neappleXpress/OpenFluxDesktop"
