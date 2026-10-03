@@ -1,0 +1,275 @@
+name: Nightly
+
+# The second release channel, next to the main one (release.yml, tags vX.Y.Z).
+# A nightly is a test build: a GitHub *prerelease* tagged
+# nightly-<date>-<commit>, built from the OpenFlux/ and shared/ submodules
+# pinned in the commit, packaged the same way as a tagged release (unsigned,
+# same as every OpenFluxDesktop build today). The app's "Ночные сборки"
+# switch (Settings > About) makes its update check look at these too; the
+# main channel never sees them.
+#
+# It runs
+#   - on a push to the `nightly` branch (that is how a test build is cut),
+#   - every night, when `nightly` has a commit that has no build yet,
+#   - from "Run workflow", on the chosen branch.
+# The newest 7 nightlies are kept; older ones and their tags are deleted.
+on:
+  push:
+    branches: [nightly]
+  schedule:
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: nightly
+  cancel-in-progress: false
+
+env:
+  WINTUN_VERSION: '0.14.1'
+  WINTUN_SHA256: '07c256185d6ee3652e09fa55c0b673e2624b565e02c4b9091c79ca7d2f24ef51'
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      build: ${{ steps.plan.outputs.build }}
+      sha: ${{ steps.plan.outputs.sha }}
+    steps:
+      - id: plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          if [ "$EVENT" = schedule ]; then
+            sha=$(git ls-remote "https://github.com/$GITHUB_REPOSITORY" refs/heads/nightly | cut -f1)
+            if [ -z "$sha" ]; then echo "No nightly branch: nothing to build"; echo "build=false" >> "$GITHUB_OUTPUT"; exit 0; fi
+            # A commit is built once: skip when a nightly already carries it.
+            if gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" --jq '.[].tag_name' | grep -q -- "-${sha:0:7}$"; then
+              echo "Nightly for ${sha:0:7} already published"; echo "build=false" >> "$GITHUB_OUTPUT"; exit 0
+            fi
+          else
+            sha="$GITHUB_SHA"
+          fi
+          echo "build=true" >> "$GITHUB_OUTPUT"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+
+  version:
+    needs: plan
+    if: needs.plan.outputs.build == 'true'
+    runs-on: ubuntu-latest
+    outputs:
+      value: ${{ steps.version.outputs.value }}
+      tag: ${{ steps.version.outputs.tag }}
+      date: ${{ steps.version.outputs.date }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.plan.outputs.sha }}
+          submodules: false
+      - id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # The upcoming main version (the last main release, one patch up) with a
+          # nightly suffix: 2.2.0 -> 2.2.1-nightly.20261003.
+          last=$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name 2>/dev/null || true)
+          last="${last#v}"
+          if ! [[ "$last" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then last="2.0.0"; fi
+          IFS=. read -r major minor patch <<< "$last"
+          date=$(date -u +%Y%m%d)
+          short=$(git rev-parse --short=7 HEAD)
+          echo "value=${major}.${minor}.$((patch + 1))-nightly.${date}" >> "$GITHUB_OUTPUT"
+          echo "tag=nightly-${date}-${short}" >> "$GITHUB_OUTPUT"
+          echo "date=${date}" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: [plan, version]
+    if: needs.plan.outputs.build == 'true'
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows x64
+            runner: windows-2022
+            goos: windows
+            goarch: amd64
+            resources: windows
+            skiko: windows-x64
+            platform: windows-x64
+            tasks: ':desktopApp:createDistributable :desktopApp:packageMsi :desktopApp:packageExe'
+          - name: Linux x64
+            runner: ubuntu-22.04
+            goos: linux
+            goarch: amd64
+            resources: linux
+            skiko: linux-x64
+            platform: linux-x64
+            tasks: ':desktopApp:createDistributable :desktopApp:packageDeb'
+          - name: macOS Apple Silicon
+            runner: macos-14
+            goos: darwin
+            goarch: arm64
+            resources: macos
+            skiko: macos-arm64
+            platform: macos-arm64
+            tasks: ':desktopApp:createDistributable :desktopApp:packageDmg'
+          - name: macOS Intel
+            runner: macos-15-intel
+            goos: darwin
+            goarch: amd64
+            resources: macos
+            skiko: macos-x64
+            platform: macos-x64
+            tasks: ':desktopApp:createDistributable :desktopApp:packageDmg'
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.plan.outputs.sha }}
+          submodules: recursive
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: OpenFlux/go.mod
+          cache-dependency-path: OpenFlux/go.sum
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Linux packaging tools
+        if: runner.os == 'Linux'
+        run: sudo apt-get update -q && sudo apt-get install -y -q fakeroot
+
+      - name: Build the core
+        run: |
+          out="$GITHUB_WORKSPACE/desktopApp/resources/${{ matrix.resources }}"
+          ext=""; [ "${{ matrix.goos }}" = windows ] && ext=".exe"
+          name="openflux-${{ matrix.goos }}-${{ matrix.goarch }}$ext"
+          mkdir -p "$out"
+          cd OpenFlux
+          GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o "$out/$name" .
+          chmod +x "$out/$name"
+          printf '%s@%s\n' "nightly" "$(git rev-parse --short HEAD)" > "$out/openflux-core.version"
+          echo "CORE_NAME=$name" >> "$GITHUB_ENV"
+          cat "$out/openflux-core.version"
+
+      - name: Wintun
+        if: runner.os == 'Windows'
+        run: |
+          curl -fsSL -o wintun.zip "https://www.wintun.net/builds/wintun-$WINTUN_VERSION.zip"
+          echo "$WINTUN_SHA256  wintun.zip" | sha256sum -c -
+          7z e -y wintun.zip wintun/bin/amd64/wintun.dll -odesktopApp/resources/windows >/dev/null
+          rm wintun.zip
+
+      - name: Tests
+        run: ./gradlew --no-daemon :shared:jvmTest
+
+      - name: Package
+        run: |
+          flags="-PappVersion=${{ needs.version.outputs.value }}"
+          [ "${{ matrix.goos }}" = windows ] && flags="$flags -PwindowsPackage=true"
+          ./gradlew --no-daemon $flags ${{ matrix.tasks }}
+
+      # Without Skia's natives for the platform (skiko) the app cannot draw
+      # a window, and nothing fails at build time: check the package.
+      - name: Check the package
+        run: |
+          app=$(find desktopApp/build/compose/binaries/main/app -mindepth 1 -maxdepth 1 | head -n1)
+          echo "App: $app"
+          find "$app" -iname "skiko-awt-runtime-${{ matrix.skiko }}*.jar" | grep -q . \
+            || { echo "::error::skiko ${{ matrix.skiko }} runtime missing from the package"; exit 1; }
+          for f in "$CORE_NAME" openflux-core.version; do
+            find "$app" -name "$f" | grep -q . || { echo "::error::$f missing from the package"; exit 1; }
+          done
+          if [ "${{ matrix.goos }}" = windows ]; then
+            find "$app" -name wintun.dll | grep -q . || { echo "::error::wintun.dll missing from the package"; exit 1; }
+          fi
+          echo "Package OK"
+
+      - name: Collect
+        run: |
+          v=${{ needs.version.outputs.value }}
+          p=${{ matrix.platform }}
+          bin=desktopApp/build/compose/binaries/main
+          mkdir -p dist
+          case "${{ matrix.goos }}" in
+            windows)
+              cp $bin/msi/*.msi "dist/OpenFlux-$v-$p.msi"
+              cp $bin/exe/*.exe "dist/OpenFlux-$v-$p-setup.exe"
+              (cd $bin/app && 7z a -tzip -mx=7 "$GITHUB_WORKSPACE/dist/OpenFlux-$v-$p-portable.zip" OpenFlux >/dev/null)
+              ;;
+            linux)
+              cp $bin/deb/*.deb "dist/OpenFlux-$v-$p.deb"
+              find $bin/app -name "$CORE_NAME" -exec chmod +x {} +
+              tar -C $bin/app -czf "dist/OpenFlux-$v-$p.tar.gz" OpenFlux
+              ;;
+            darwin)
+              cp $bin/dmg/*.dmg "dist/OpenFlux-$v-$p.dmg"
+              ;;
+          esac
+          ls -l dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: OpenFluxDesktop-${{ needs.version.outputs.value }}-${{ matrix.platform }}
+          path: dist/*
+          if-no-files-found: error
+
+  publish:
+    name: Publish the nightly prerelease
+    needs: [plan, version, build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.plan.outputs.sha }}
+          submodules: false
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Checksums
+        run: cd dist && sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt
+
+      - name: Publish prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="${{ needs.version.outputs.tag }}"
+          notes="Ночная сборка: тестовая, может ломаться. Не основной выпуск — включается переключателем «Ночные сборки» в настройках. Ядро: \`$(cd OpenFlux && git rev-parse --short HEAD)\`. Сборки не подписаны, как и основные (см. README). Контрольные суммы — в \`SHA256SUMS.txt\`."
+          pending=$(awk 'index($0, "## [Unreleased]")==1 { f=1; next } index($0, "## [")==1 { f=0 } f' CHANGELOG.md | sed '/./,$!d')
+          [ -n "$pending" ] && notes="$pending"$'\n\n'"$notes"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" dist/* --clobber
+            gh release edit "$tag" --prerelease --notes "$notes"
+          else
+            gh release create "$tag" dist/* \
+              --prerelease \
+              --target "${{ needs.plan.outputs.sha }}" \
+              --title "OpenFluxDesktop nightly ${{ needs.version.outputs.date }} (${tag##*-})" \
+              --notes "$notes"
+          fi
+
+      - name: Keep the newest 7 nightlies
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" \
+            --jq '[.[] | select(.tag_name | startswith("nightly-"))] | sort_by(.created_at) | reverse | .[7:] | .[].tag_name' |
+            while read -r old; do
+              echo "removing old nightly $old"
+              gh release delete "$old" --cleanup-tag --yes
+            done
