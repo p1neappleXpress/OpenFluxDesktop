@@ -24,8 +24,11 @@ All notable changes to OpenFluxDesktop. Format loosely follows
   longer fails when the host cuts a transfer short (InfinityFree's FTP aborted
   the link parser part way): a file is sent again, and `auto` goes on in plain
   FTP after it keeps failing over TLS. Bumps `OpenFlux` to
-  [`d245db7`](https://github.com/p1neappleXpress/OpenFlux/commit/d245db7) and
+  [`bb55dc3`](https://github.com/p1neappleXpress/OpenFlux/commit/bb55dc3) and
   `shared` to [`98572e2`](https://github.com/p1neappleXpress/OpenFluxClientShared/commit/98572e2).
+- The core's Yandex Boards moves packets as `modify-objects` text objects (the
+  board no longer relays `notify-position`), and Yandex Docs and Mail.ru Docs
+  send the web client's `saveChanges` stream built from the live session.
 
 ### Added
 
