@@ -11,6 +11,7 @@ import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.isRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
@@ -151,6 +152,78 @@ class DemoRecorder {
                 shot("verify")
                 waitFor { model.step == io.openflux.desktop.ui.node.PhpStep.Done }
                 shot("done")
+            }
+        }
+    }
+
+    /**
+     * The Transports tab with a script that has settings, and the settings dialog: one PNG each.
+     * OPENFLUX_DEMO_SCRIPTS=<dir> ./gradlew :desktopApp:test --tests '*DemoRecorder.recordScripts'
+     */
+    @Test
+    fun recordScripts() {
+        val out = System.getenv("OPENFLUX_DEMO_SCRIPTS") ?: return
+        for (platform in listOf(PlatformKind.Desktop, PlatformKind.Android)) {
+            val dir = File(File(out, platform.name.lowercase()), "scripts").apply { deleteRecursively(); mkdirs() }
+            val demo = Demo(platform)
+            val desktop = platform == PlatformKind.Desktop
+            val repo = io.openflux.desktop.service.InMemoryScriptRepository().apply {
+                upsert(
+                    io.openflux.desktop.model.InstalledScript(
+                        id = "my-transport", name = "Мой транспорт", version = "1.3.0", pubkeyHex = "aa", fingerprint = "ab".repeat(32),
+                        fileName = "my-transport.flux", source = io.openflux.desktop.model.ScriptSource.GitHub,
+                        params = listOf(
+                            io.openflux.desktop.model.ScriptParam("url", "Ссылка", "url", true, scope = "profile"),
+                            io.openflux.desktop.model.ScriptParam("token", "API-токен", "secret", true, scope = "settings"),
+                            io.openflux.desktop.model.ScriptParam("retries", "Число повторов", "number", scope = "settings", default = "3"),
+                            io.openflux.desktop.model.ScriptParam("compress", "Сжимать", "boolean", scope = "settings"),
+                        ),
+                        settings = mapOf("token" to "x", "retries" to "5"),
+                    ),
+                )
+                upsert(
+                    io.openflux.desktop.model.InstalledScript(
+                        id = "mailru", name = "mailru", version = "1.1.0", pubkeyHex = "bb", fingerprint = "cd".repeat(32),
+                        fileName = "mailru.js", official = true, source = io.openflux.desktop.model.ScriptSource.Bundled,
+                        params = listOf(io.openflux.desktop.model.ScriptParam("url", "Ссылка", "url", true)),
+                    ),
+                )
+            }
+            val platformWithSettings = object : PlatformServices by demo.platform {
+                override fun scriptSettings(data: ByteArray, sig: ByteArray, pubkeyHex: String, valuesJson: String, lang: String) =
+                    """{"ok":false,"code":"bad_signature","error":"x"}"""
+            }
+            val container = AppContainer(
+                demo.profiles, demo.settings, demo.connection, platformWithSettings, demo.codec, DemoNode(demo.codec), DemoPhp(), scripts = repo,
+            )
+            runSkikoComposeUiTest(size = if (desktop) Size(1100f, 900f) else Size(412f, 900f), density = Density(1f)) {
+                mainClock.autoAdvance = false
+                setContent {
+                    io.openflux.desktop.ui.theme.OpenFluxTheme(dark = desktop, touch = !desktop) {
+                        androidx.compose.runtime.CompositionLocalProvider(
+                            io.openflux.desktop.ui.LocalTouchUi provides !desktop,
+                            io.openflux.desktop.service.LocalAppContainer provides container,
+                            io.openflux.desktop.ui.components.LocalToaster provides io.openflux.desktop.ui.components.Toaster(),
+                            io.openflux.desktop.ui.LocalScrollbars provides NoScrollbars,
+                        ) {
+                            androidx.compose.foundation.layout.Box(
+                                androidx.compose.ui.Modifier.fillMaxSize().background(io.openflux.desktop.ui.theme.AppTheme.colors.background),
+                            ) {
+                                io.openflux.desktop.ui.scripts.ScriptsScreen(container)
+                                io.openflux.desktop.ui.shell.ScriptSettingsDialog()
+                            }
+                        }
+                    }
+                }
+                fun shot(name: String) {
+                    repeat(4) { mainClock.advanceTimeBy(80); Thread.sleep(15) }
+                    ImageIO.write(captureToImage().toAwtImage(), "png", File(dir, "$name.png"))
+                }
+                shot("1-list")
+                onAllNodesWithText("Настроено 2 из 3").onFirst().assertExists()
+                onAllNodesWithText("Настройки").onFirst().performClick()
+                Thread.sleep(300)
+                shot("2-dialog-error")
             }
         }
     }
