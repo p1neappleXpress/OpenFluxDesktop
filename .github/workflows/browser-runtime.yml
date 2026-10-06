@@ -15,9 +15,6 @@ on:
         description: 'Rebuild the release even if it exists'
         type: boolean
         default: false
-  # The first run, from the branch this came in on; delete this trigger once it is merged.
-  push:
-    branches: [feature/browser-runtime-mirror]
 
 permissions:
   contents: write
