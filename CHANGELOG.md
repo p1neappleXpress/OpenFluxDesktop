@@ -5,6 +5,15 @@ All notable changes to OpenFluxDesktop. Format loosely follows
 
 ## [Unreleased]
 
+### Added
+
+- The built-in browser's runtime (JetBrains Runtime with JCEF, about 230 MB) now has a second
+  place to be downloaded from: a storage release of this repository, `browser-runtime-<version>-<build>`
+  (not an app release; it is never "latest" and the update check ignores it). A workflow copies the
+  archives byte for byte from JetBrains' CDN, which some networks throttle to about 1 KB/s, checks them
+  against the hashes pinned in the app and the ones JetBrains publishes, signs them with a GitHub build
+  attestation and lists every hash and source address in the release text.
+
 ## [2.2.0] - 2026-10-01
 
 ### Added

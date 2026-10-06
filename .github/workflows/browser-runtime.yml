@@ -1,0 +1,133 @@
+name: Browser runtime
+
+# NOT an app release. The built-in browser of OpenFlux Desktop (KCEF, Chromium) runs on one archive,
+# a JetBrains Runtime with JCEF, which JetBrains publishes only on a CDN that some networks throttle to
+# about 1 KB/s. This job copies those archives, byte for byte, into a release of this repository
+# (tag browser-runtime-<version>-<build>), which the app tries before the CDN.
+#
+# Nothing here has to be trusted: the app checks every download against the SHA-512 values pinned in
+# its source, the job checks the same values against what JetBrains publishes, the release shows every
+# hash and every source address, and the files carry a signed GitHub build attestation.
+on:
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Rebuild the release even if it exists'
+        type: boolean
+        default: false
+  # The first run, from the branch this came in on; delete this trigger once it is merged.
+  push:
+    branches: [feature/browser-runtime-mirror]
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+concurrency:
+  group: browser-runtime
+  cancel-in-progress: false
+
+env:
+  JBR_VERSION: '21.0.6'
+  JBR_BUILD: 'b895.97'
+  JBR_BASE: https://cache-redirector.jetbrains.com/intellij-jbr
+  JBR_RELEASE: https://github.com/JetBrains/JetBrainsRuntime/releases/tag/jbr-release-21.0.6b895.97
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - id: plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FORCE: ${{ inputs.force }}
+        run: |
+          tag="browser-runtime-${JBR_VERSION}-${JBR_BUILD}"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          if gh release view "$tag" >/dev/null 2>&1 && [ "$FORCE" != "true" ]; then
+            echo "Release $tag exists: nothing to do (run it with force to rebuild)"
+            echo "build=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "build=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Download from JetBrains and check
+        if: steps.plan.outputs.build == 'true'
+        run: |
+          set -euo pipefail
+          mkdir dist
+          grep -v '^#' .github/browser-runtime.sha512 | while read -r key pinned; do
+            name="jbr_jcef-${JBR_VERSION}-${key}-${JBR_BUILD}.tar.gz"
+            echo "== $name"
+            curl -fsSL --retry 5 --retry-delay 5 -o "dist/$name" "$JBR_BASE/$name"
+            curl -fsSL --retry 5 --retry-delay 5 -o "dist/$name.checksum" "$JBR_BASE/$name.checksum"
+            got=$(sha512sum "dist/$name" | cut -d' ' -f1)
+            published=$(cut -d' ' -f1 "dist/$name.checksum")
+            echo "  downloaded : $got"
+            echo "  pinned     : $pinned"
+            echo "  JetBrains  : $published"
+            [ "$got" = "$pinned" ] || { echo "::error::$name: the download is not the pinned file"; exit 1; }
+            [ "$published" = "$pinned" ] || { echo "::error::$name: JetBrains publishes another checksum now"; exit 1; }
+          done
+          ls -l dist
+
+      - name: Sums, sources and the release text
+        if: steps.plan.outputs.build == 'true'
+        run: |
+          set -euo pipefail
+          cd dist
+          sha512sum jbr_jcef-*.tar.gz > SHA512SUMS.txt
+          sha256sum jbr_jcef-*.tar.gz > SHA256SUMS.txt
+          for f in jbr_jcef-*.tar.gz; do printf '%s\n  %s/%s\n' "$f" "$JBR_BASE" "$f"; done > SOURCES.txt
+          {
+            echo "**This is not a release of OpenFlux.** It is the storage the built-in browser of OpenFlux Desktop downloads its runtime from when JetBrains' CDN is slow or blocked (some networks get about 1 KB/s from it). Nothing here is installed by hand."
+            echo
+            echo "## What it is"
+            echo
+            echo "JetBrains Runtime $JBR_VERSION build $JBR_BUILD with JCEF (Chromium Embedded Framework), the files JetBrains publishes for its IDEs, for the six platforms OpenFlux Desktop runs on. They are **byte for byte the files JetBrains publishes**, copied by [this workflow run]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID) (commit \`${GITHUB_SHA::7}\`), not rebuilt and not modified. JetBrains' own page for the version: $JBR_RELEASE"
+            echo
+            echo "## Sources and hashes"
+            echo
+            echo "| File | Size | SHA-256 | SHA-512 (the value JetBrains publishes) | Source |"
+            echo "|---|---|---|---|---|"
+            for f in jbr_jcef-*.tar.gz; do
+              printf '| `%s` | %s MB | `%s` | `%s` | %s/%s |\n' "$f" "$(( $(stat -c %s "$f") / 1048576 ))" "$(sha256sum "$f" | cut -d' ' -f1)" "$(sha512sum "$f" | cut -d' ' -f1)" "$JBR_BASE" "$f"
+            done
+            echo
+            echo "Beside every archive is JetBrains' own \`.checksum\` file, as downloaded; \`SHA512SUMS.txt\`, \`SHA256SUMS.txt\` and \`SOURCES.txt\` list the same things."
+            echo
+            echo "## Check it yourself"
+            echo
+            echo "1. The hash against JetBrains' own: download the \`.checksum\` from the source address in the table (or use the one attached here) and compare; or \`sha512sum -c SHA512SUMS.txt\` here."
+            echo "2. The signature: every archive has a GitHub build attestation (Sigstore) saying it came out of this workflow run: \`gh attestation verify <file> --repo $GITHUB_REPOSITORY\`."
+            echo "3. The app never trusts this page or this storage: it checks each download against the SHA-512 values written in its own source (\`BuiltInBrowser.RUNTIME_SHA512\`, [OpenFluxClientShared](https://github.com/p1neappleXpress/OpenFluxClientShared)) before it unpacks or runs anything, and the same values are in \`.github/browser-runtime.sha512\` of this repository, which this workflow checks against JetBrains' on every run."
+            echo
+            echo "## Licenses"
+            echo
+            echo "OpenJDK (GPLv2 with the Classpath Exception), JCEF and CEF (BSD) and Chromium with its third-party components: the license texts are inside every archive, in its \`legal/\` folder."
+          } > ../notes.md
+          cat ../notes.md
+
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        if: steps.plan.outputs.build == 'true'
+        with:
+          subject-path: dist/jbr_jcef-*.tar.gz
+
+      - name: Publish the release
+        if: steps.plan.outputs.build == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.plan.outputs.tag }}
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/* --clobber
+            gh release edit "$TAG" --notes-file notes.md --latest=false
+          else
+            gh release create "$TAG" dist/* \
+              --title "Built-in browser runtime: JBR $JBR_VERSION $JBR_BUILD (storage for the app, not an app release)" \
+              --notes-file notes.md --latest=false --target "$GITHUB_SHA"
+          fi

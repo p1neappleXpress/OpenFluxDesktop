@@ -1,0 +1,11 @@
+# The JetBrains Runtime with JCEF the built-in browser runs on (KCEF), one line per platform:
+#   <platform> <SHA-512 of jbr_jcef-<version>-<platform>-<build>.tar.gz>
+# The values JetBrains publishes in the .checksum file beside each archive. They are also pinned in the
+# app (OpenFluxClientShared, BuiltInBrowser.RUNTIME_SHA512), which checks every download against them:
+# change both together when the version in .github/workflows/browser-runtime.yml changes.
+windows-x64 5367cbf1188d29d72574263c55e6e855ddce3d64c1908868d8c273183eaa339f6db0b98fb1b225ba5ac61e8f3365afa71fd0372dc4b72b37cd23dd778bb37940
+windows-aarch64 e889c269c5ab247c12293cd018619cfc31b3b8e664a5f2f71f3e8bed3140305eb7219d9596a514e798322cec838ec244b200fc4ac3d43f35f9a099b52822296a
+osx-x64 2e8d0cecd41e07a18162633c25592dfd8f32157591b09f487dd7357c1226fbc860d9519eaaf65d6140cc7bfb6bbf957139deac59f47c066684f3785105c2f104
+osx-aarch64 6ad87205a87e2921b7fa5389dbdd98a2f33a7013842b9e49c53465dca2bb434cae5f60b12d17edfb5e4f792fac78a8d31e222d611a9b74089e7845cbe977c135
+linux-x64 3c8c2c853acacbb096966175aae7967ea1280a7ab43c5e33a6cec17bd22fe0a243431811dcb66cdb6dd141c1144b13edf8b7b6bde1f7ba649749c0e4bd7b5cd8
+linux-aarch64 0a34abdd58786b14e4dc2ad56c87a58920337ca8909f5612b45b0cddd7868158beed63a44e8dee6d1ea0eac65ead56e7e788e0d39ba7599749588328feea5995
