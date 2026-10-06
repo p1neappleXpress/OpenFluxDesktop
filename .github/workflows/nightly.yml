@@ -1,27 +1,30 @@
-name: Release
+name: Nightly
 
-# A tag like v1.2.3 builds OpenFlux for Windows, Linux and macOS from the
-# OpenFlux/ and shared/ submodules pinned in that commit, and publishes the
-# packages as a GitHub release. "Run workflow" builds them as artifacts
-# without publishing, for a dry run.
+# The second release channel, next to the main one (release.yml, tags vX.Y.Z).
+# A nightly is a test build: a GitHub *prerelease* tagged
+# nightly-<date>-<commit>, built from the OpenFlux/ and shared/ submodules
+# pinned in the commit, packaged the same way as a tagged release (unsigned,
+# same as every OpenFluxDesktop build today). The app's "Ночные сборки"
+# switch (Settings > About) makes its update check look at these too; the
+# main channel never sees them.
+#
+# It runs
+#   - on a push to the `nightly` branch (that is how a test build is cut),
+#   - every night, when `nightly` has a commit that has no build yet,
+#   - from "Run workflow", on the chosen branch.
+# The newest 7 nightlies are kept; older ones and their tags are deleted.
 on:
   push:
-    tags: ['v*']
+    branches: [nightly]
+  schedule:
+    - cron: '0 2 * * *'
   workflow_dispatch:
-    inputs:
-      publish:
-        description: 'Publish a release (tag the built commit as v<version>)'
-        type: boolean
-        default: false
-      version:
-        description: 'Version (1.2.3); required when publish is checked from a manual run'
-        required: false
 
 permissions:
   contents: write
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: nightly
   cancel-in-progress: false
 
 env:
@@ -29,7 +32,67 @@ env:
   WINTUN_SHA256: '07c256185d6ee3652e09fa55c0b673e2624b565e02c4b9091c79ca7d2f24ef51'
 
 jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      build: ${{ steps.plan.outputs.build }}
+      sha: ${{ steps.plan.outputs.sha }}
+    steps:
+      - id: plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          if [ "$EVENT" = schedule ]; then
+            sha=$(git ls-remote "https://github.com/$GITHUB_REPOSITORY" refs/heads/nightly | cut -f1)
+            if [ -z "$sha" ]; then echo "No nightly branch: nothing to build"; echo "build=false" >> "$GITHUB_OUTPUT"; exit 0; fi
+            # A commit is built once: skip when a nightly already carries it.
+            if gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" --jq '.[].tag_name' | grep -q -- "-${sha:0:7}$"; then
+              echo "Nightly for ${sha:0:7} already published"; echo "build=false" >> "$GITHUB_OUTPUT"; exit 0
+            fi
+          else
+            sha="$GITHUB_SHA"
+          fi
+          echo "build=true" >> "$GITHUB_OUTPUT"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+
+  version:
+    needs: plan
+    if: needs.plan.outputs.build == 'true'
+    runs-on: ubuntu-latest
+    outputs:
+      value: ${{ steps.version.outputs.value }}
+      numeric: ${{ steps.version.outputs.numeric }}
+      tag: ${{ steps.version.outputs.tag }}
+      date: ${{ steps.version.outputs.date }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ needs.plan.outputs.sha }}
+          submodules: false
+      - id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # The upcoming main version (the last main release, one patch up) with a
+          # nightly suffix: 2.2.0 -> 2.2.1-nightly.20261003.
+          last=$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name 2>/dev/null || true)
+          last="${last#v}"
+          if ! [[ "$last" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then last="2.0.0"; fi
+          IFS=. read -r major minor patch <<< "$last"
+          date=$(date -u +%Y%m%d)
+          short=$(git rev-parse --short=7 HEAD)
+          # jpackage (packageMsi/packageExe/packageDmg) rejects anything but
+          # plain MAJOR.MINOR.PATCH, so the nightly suffix can only go on the
+          # display/artifact/tag strings, not on what Gradle packages with.
+          echo "numeric=${major}.${minor}.$((patch + 1))" >> "$GITHUB_OUTPUT"
+          echo "value=${major}.${minor}.$((patch + 1))-nightly.${date}" >> "$GITHUB_OUTPUT"
+          echo "tag=nightly-${date}-${short}" >> "$GITHUB_OUTPUT"
+          echo "date=${date}" >> "$GITHUB_OUTPUT"
+
   build:
+    needs: [plan, version]
+    if: needs.plan.outputs.build == 'true'
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.runner }}
     strategy:
@@ -74,18 +137,8 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
+          ref: ${{ needs.plan.outputs.sha }}
           submodules: recursive
-
-      - name: Version
-        id: version
-        run: |
-          v="${{ inputs.version }}"
-          if [ -z "$v" ] && [[ "$GITHUB_REF" == refs/tags/v* ]]; then v="${GITHUB_REF#refs/tags/v}"; fi
-          if [ -z "$v" ]; then v="0.0.0-dev"; fi
-          # jpackage wants MAJOR.MINOR.BUILD with numbers only, MAJOR > 0 on macOS.
-          if ! [[ "$v" =~ ^[1-9][0-9]*\.[0-9]+\.[0-9]+$ ]]; then echo "::error::version '$v' is not MAJOR.MINOR.BUILD"; exit 1; fi
-          echo "value=$v" >> "$GITHUB_OUTPUT"
-          echo "Version $v, core $(git -C OpenFlux rev-parse --short HEAD)"
 
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
@@ -112,7 +165,7 @@ jobs:
           cd OpenFlux
           GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o "$out/$name" .
           chmod +x "$out/$name"
-          printf '%s@%s\n' "main" "$(git rev-parse --short HEAD)" > "$out/openflux-core.version"
+          printf '%s@%s\n' "nightly" "$(git rev-parse --short HEAD)" > "$out/openflux-core.version"
           echo "CORE_NAME=$name" >> "$GITHUB_ENV"
           cat "$out/openflux-core.version"
 
@@ -129,7 +182,7 @@ jobs:
 
       - name: Package
         run: |
-          flags="-PappVersion=${{ steps.version.outputs.value }}"
+          flags="-PappVersion=${{ needs.version.outputs.numeric }}"
           [ "${{ matrix.goos }}" = windows ] && flags="$flags -PwindowsPackage=true"
           ./gradlew --no-daemon $flags ${{ matrix.tasks }}
 
@@ -151,7 +204,7 @@ jobs:
 
       - name: Collect
         run: |
-          v=${{ steps.version.outputs.value }}
+          v=${{ needs.version.outputs.value }}
           p=${{ matrix.platform }}
           bin=desktopApp/build/compose/binaries/main
           mkdir -p dist
@@ -174,25 +227,19 @@ jobs:
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: OpenFluxDesktop-${{ steps.version.outputs.value }}-${{ matrix.platform }}
+          name: OpenFluxDesktop-${{ needs.version.outputs.value }}-${{ matrix.platform }}
           path: dist/*
           if-no-files-found: error
 
   publish:
-    name: Publish the release
-    needs: [build]
-    if: startsWith(github.ref, 'refs/tags/v') || (inputs.publish && inputs.version != '')
+    name: Publish the nightly prerelease
+    needs: [plan, version, build]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
+          ref: ${{ needs.plan.outputs.sha }}
           submodules: false
-
-      - name: Tag
-        id: tag
-        run: |
-          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then echo "name=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
-          else echo "name=v${{ inputs.version }}" >> "$GITHUB_OUTPUT"; fi
 
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
@@ -202,33 +249,32 @@ jobs:
       - name: Checksums
         run: cd dist && sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt
 
-      # The release shows its CHANGELOG.md section, then which file is for
-      # which system.
-      - name: Notes
+      - name: Publish prerelease
         env:
-          tag: ${{ steps.tag.outputs.name }}
+          GH_TOKEN: ${{ github.token }}
         run: |
-          awk -v v="${tag#v}" 'index($0, "## [")==1 { if (f) exit; f = (index($0, "## [" v "]") == 1); next } f' CHANGELOG.md > notes.md
-          cat >> notes.md <<'TABLE'
+          tag="${{ needs.version.outputs.tag }}"
+          notes="Ночная сборка: тестовая, может ломаться. Не основной выпуск — включается переключателем «Ночные сборки» в настройках. Ядро: \`$(cd OpenFlux && git rev-parse --short HEAD)\`. Сборки не подписаны, как и основные (см. README). Контрольные суммы — в \`SHA256SUMS.txt\`."
+          pending=$(awk 'index($0, "## [Unreleased]")==1 { f=1; next } index($0, "## [")==1 { f=0 } f' CHANGELOG.md | sed '/./,$!d')
+          [ -n "$pending" ] && notes="$pending"$'\n\n'"$notes"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" dist/* --clobber
+            gh release edit "$tag" --prerelease --notes "$notes"
+          else
+            gh release create "$tag" dist/* \
+              --prerelease \
+              --target "${{ needs.plan.outputs.sha }}" \
+              --title "OpenFluxDesktop nightly ${{ needs.version.outputs.date }} (${tag##*-})" \
+              --notes "$notes"
+          fi
 
-          | Система | Файл |
-          |---|---|
-          | **Windows** 10/11 x64 | `.msi` или `-setup.exe` (установка), `-portable.zip` (без установки, запуск `OpenFlux.exe`) |
-          | **Linux** x64 | `.deb` (Debian, Ubuntu, Mint) или `.tar.gz` (запуск `OpenFlux/bin/OpenFlux`) |
-          | **macOS** | `-macos-arm64.dmg` (Apple Silicon) или `-macos-x64.dmg` (Intel) |
-
-          - Встроенный браузер для входа в Яндекс и проверок (~230 МБ) скачивается при первом использовании.
-          - Режим «Весь трафик компьютера» (TUN) есть в Windows и macOS (Windows спрашивает разрешение UAC, macOS — пароль администратора), системный прокси включается только в Windows. На Linux программы подключаются к SOCKS5 `127.0.0.1:1080` или HTTP `127.0.0.1:1081`.
-          - Сборки для macOS не подписаны: при первом запуске откройте приложение через правый клик → «Открыть».
-          - Контрольные суммы — в `SHA256SUMS.txt`.
-          TABLE
-          cat notes.md
-
-      - uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
-        with:
-          tag_name: ${{ steps.tag.outputs.name }}
-          target_commitish: ${{ github.sha }}
-          name: OpenFluxDesktop ${{ steps.tag.outputs.name }}
-          generate_release_notes: true
-          files: dist/*
-          body_path: notes.md
+      - name: Keep the newest 7 nightlies
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" \
+            --jq '[.[] | select(.tag_name | startswith("nightly-"))] | sort_by(.created_at) | reverse | .[7:] | .[].tag_name' |
+            while read -r old; do
+              echo "removing old nightly $old"
+              gh release delete "$old" --cleanup-tag --yes
+            done

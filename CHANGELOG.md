@@ -5,6 +5,51 @@ All notable changes to OpenFluxDesktop. Format loosely follows
 
 ## [Unreleased]
 
+## [2.3.0] - 2026-10-07
+
+### Added
+
+- **Exit node: choose L3 or L4.** Home → «Выходная нода» → «Выход»: **L4** ends the clients'
+  connections here and opens its own (works everywhere, no rights needed), **L3** passes their
+  packets on as they are (2 to 6 times faster for one stream in our measurements over Yandex Docs and
+  Boards, see OpenFluxClientShared#17) and needs rights. On Windows L3 asks for administrator permission (UAC)
+  for the core alone and needs WinDivert: **it is downloaded by the app when it is not there**
+  (WinDivert 2.2.2, checked against a pinned SHA-256 before every start, kept in
+  `%LOCALAPPDATA%\OpenFlux\windivert`). On Linux L3 needs root; macOS has no L3 exit yet.
+- **«Экспериментальные функции»** (Settings): the JS-transport features below are off by default.
+- **JS transports** (experimental, off by default): the «Транспорты» tab, installing a signed
+  transport by link, file or catalog with a trust dialog and the author's key fingerprint, the
+  settings the transport declares (a wizard page), its own setup and login pages in the built-in
+  browser, update check with changelog, apply and roll back; OpenFlux's own transports folded below
+  the added ones. Needs the switch above; nothing of it is shown, started or fetched without it.
+- «Ночные сборки» (Settings → О программе): the update check can look at the nightly test builds
+  next to the main releases.
+- The built-in browser's runtime (JetBrains Runtime with JCEF, about 230 MB) has a second place to be
+  downloaded from: a storage release of this repository, `browser-runtime-<version>-<build>` (not an
+  app release: it is never "latest" and the update check ignores it). A workflow copies the archives
+  byte for byte from JetBrains' CDN, which some networks throttle to about 1 KB/s, checks them
+  against the hashes pinned in the app and the ones JetBrains publishes, signs them with a GitHub
+  build attestation and lists every hash and source address in the release text.
+
+### Changed
+
+- The built-in browser's runtime is downloaded by the app itself, not by the browser library: into a
+  folder that survives a failed attempt, resumed where it stopped after a cut or a restart, checked
+  against a SHA-512 pinned in the app before anything unpacks it, and kept until the browser has
+  started. The steps are shown in the order they happen (download, check, unpack, install, start).
+- Bumps `OpenFlux` to the core 0.4.0 ([`a415c09`](https://github.com/p1neappleXpress/OpenFlux/commit/a415c09d1d1006a201b5e9523d2f30d7ee2b4149)) and `shared` to
+  [`a7fca72`](https://github.com/p1neappleXpress/OpenFluxClientShared/commit/a7fca72).
+
+### Fixed
+
+- The built-in browser was downloaded again and again on a slow or cut connection (the library tried
+  twice per start, from byte zero, into a temp file, and then said "downloaded: restart OpenFlux"
+  although nothing was). A runtime that lost its library to a cleaner is repaired instead of trusted.
+- A Yandex check on a profile without a key reached no one: the app never opened its browser. The
+  core now sends it to the app (core 0.4.0).
+- Dependencies and CI: every GitHub Action is pinned to a commit SHA; the core's Go and crypto
+  dependencies are up to date (see the core's changelog).
+
 ## [2.2.0] - 2026-10-01
 
 ### Added
