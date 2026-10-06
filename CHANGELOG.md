@@ -37,7 +37,7 @@ All notable changes to OpenFluxDesktop. Format loosely follows
   folder that survives a failed attempt, resumed where it stopped after a cut or a restart, checked
   against a SHA-512 pinned in the app before anything unpacks it, and kept until the browser has
   started. The steps are shown in the order they happen (download, check, unpack, install, start).
-- Bumps `OpenFlux` to the core 0.4.0 (@CORE@) and `shared` to
+- Bumps `OpenFlux` to the core 0.4.0 ([`c30c2b2`](https://github.com/p1neappleXpress/OpenFlux/commit/c30c2b20500e17f547cf317caf024e4b3d81fb46)) and `shared` to
   [`a7fca72`](https://github.com/p1neappleXpress/OpenFluxClientShared/commit/a7fca72).
 
 ### Fixed
