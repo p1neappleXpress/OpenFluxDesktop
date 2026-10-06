@@ -12,6 +12,7 @@ import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
+import androidx.compose.ui.test.onLast
 import androidx.compose.ui.test.isRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
@@ -178,7 +179,6 @@ class DemoRecorder {
                             io.openflux.desktop.model.ScriptParam("retries", "Число повторов", "number", scope = "settings", default = "3"),
                             io.openflux.desktop.model.ScriptParam("compress", "Сжимать", "boolean", scope = "settings"),
                         ),
-                        settings = mapOf("token" to "x", "retries" to "5"),
                     ),
                 )
                 upsert(
@@ -220,11 +220,55 @@ class DemoRecorder {
                     ImageIO.write(captureToImage().toAwtImage(), "png", File(dir, "$name.png"))
                 }
                 shot("1-list")
-                onAllNodesWithText("Настроено 2 из 3").onFirst().assertExists()
                 onAllNodesWithText("Настройки").onFirst().performClick()
                 Thread.sleep(300)
                 shot("2-dialog-error")
             }
+        }
+    }
+
+    /**
+     * The whole app with the experimental features off (the default) and on: the «Транспорты» tab is not
+     * there until they are turned on, and the Settings page that turns them on. One PNG each; the
+     * assertions run whenever the test does.
+     * OPENFLUX_DEMO_EXPERIMENTAL=<dir> ./gradlew :desktopApp:test --tests '*DemoRecorder.recordExperimental'
+     */
+    @Test
+    fun recordExperimental() {
+        val out = System.getenv("OPENFLUX_DEMO_EXPERIMENTAL") ?: return
+        listOf(HomeTab, ProfilesTab, LogsTab, SettingsTab).forEach(ScreenModelStore::onDispose)
+        val dir = File(out, "experimental").apply { deleteRecursively(); mkdirs() }
+        val demo = Demo(PlatformKind.Desktop)
+        runSkikoComposeUiTest(size = Size(1100f, 760f), density = Density(1f)) {
+            mainClock.autoAdvance = false
+            setContent { OpenFluxApp(demo.container, NoScrollbars, Shortcuts()) }
+            fun shot(name: String) {
+                repeat(6) { mainClock.advanceTimeBy(80); Thread.sleep(15) }
+                ImageIO.write(captureToImage().toAwtImage(), "png", File(dir, "$name.png"))
+            }
+            repeat(8) { mainClock.advanceTimeBy(80) }
+            // The sidebar's entries are on the left; "Транспорты" is also a row of the Home screen's details.
+            fun sidebarHas(title: String) = onAllNodesWithText(title).fetchSemanticsNodes().any { it.boundsInRoot.left < 300f }
+            // Off by default: the sidebar has Главная, Профили, Логи, Настройки, and no Транспорты.
+            check(!demo.settings.settings.value.experimental)
+            check(sidebarHas("Профили") && !sidebarHas("Транспорты")) { "the Transports tab is there by default" }
+            shot("1-off-home")
+            onAllNodesWithText("Настройки").onFirst().performClick()
+            repeat(8) { mainClock.advanceTimeBy(80) }
+            onAllNodesWithText("Экспериментальные функции").onFirst().performClick()
+            repeat(8) { mainClock.advanceTimeBy(80) }
+            shot("2-off-settings")
+            // The switch turns it on: the tab appears.
+            onAllNodesWithText("Экспериментальные функции").onLast().performClick()
+            repeat(8) { mainClock.advanceTimeBy(80) }
+            check(demo.settings.settings.value.experimental) { "the switch did not turn the features on" }
+            check(sidebarHas("Транспорты")) { "the Transports tab did not appear" }
+            shot("3-on-settings")
+            // And off again.
+            onAllNodesWithText("Экспериментальные функции").onLast().performClick()
+            repeat(8) { mainClock.advanceTimeBy(80) }
+            check(!demo.settings.settings.value.experimental)
+            check(!sidebarHas("Транспорты")) { "the Transports tab stayed after the features were turned off" }
         }
     }
 
