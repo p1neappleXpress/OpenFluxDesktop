@@ -5,6 +5,21 @@ All notable changes to OpenFluxDesktop. Format loosely follows
 
 ## [Unreleased]
 
+## [2.3.1] - 2026-10-07
+
+Hotfix: the core 0.4.1.
+
+### Fixed
+
+- **Yandex Docs / Boards / Volga through a node: the check no longer repeats forever.** The built-in
+  browser passes a Yandex check from the node's IPv4 address (through the tunnel), but the node's own
+  requests went out over IPv6 on hosts that have an IPv6 route, so Yandex never accepted the cookies
+  the app handed over. The core now dials Yandex IPv4 first (core 0.4.1, `OpenFlux` bumped to
+  [`d0578b6`](https://github.com/p1neappleXpress/OpenFlux/commit/d0578b6)). Exit nodes on a VDS need the
+  same core: «Своя нода» installs `node-v1.2.1`.
+- **Exit node, L3: the log (`-d`) shows the tunnel's packets only**, not every packet the computer receives
+  (its own connections, DNS, scans), on Windows and Linux alike.
+
 ## [2.3.0] - 2026-10-07
 
 ### Added
