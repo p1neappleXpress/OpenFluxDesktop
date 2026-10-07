@@ -9,6 +9,9 @@ import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.SkikoComposeUiTest
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
@@ -69,6 +72,7 @@ import javax.imageio.ImageIO
 import kotlin.concurrent.thread
 import kotlin.math.roundToInt
 import kotlin.test.Test
+import kotlin.test.assertTrue
 
 /**
  * Records the README demos from the real screens: OpenFluxApp with demo
@@ -223,6 +227,80 @@ class DemoRecorder {
                 onAllNodesWithText("Настройки").onFirst().performClick()
                 Thread.sleep(300)
                 shot("2-dialog-error")
+            }
+        }
+    }
+
+    /**
+     * A script's settings page takes the whole window, on the desktop and on a phone: the page is
+     * not a dialog's 700 dp wide. The assertions run whenever the test does; one PNG per platform
+     * when OPENFLUX_DEMO_FULLSCREEN=<dir> is set.
+     */
+    @Test
+    fun settingsPageIsFullScreen() {
+        val out = System.getenv("OPENFLUX_DEMO_FULLSCREEN")?.let { File(it).apply { mkdirs() } }
+        for (platform in listOf(PlatformKind.Desktop, PlatformKind.Android)) {
+            val desktop = platform == PlatformKind.Desktop
+            val demo = Demo(platform)
+            val inner = io.openflux.desktop.service.InMemoryScriptRepository().apply {
+                upsert(
+                    io.openflux.desktop.model.InstalledScript(
+                        id = "my-transport", name = "Мой транспорт", version = "1.3.0", pubkeyHex = "aa", fingerprint = "ab".repeat(32),
+                        fileName = "my-transport.flux", source = io.openflux.desktop.model.ScriptSource.GitHub,
+                    ),
+                )
+            }
+            val repo = object : io.openflux.desktop.service.ScriptRepository by inner {
+                override fun packageBytes(id: String) = ByteArray(4) to ByteArray(0)
+            }
+            val platformServices = object : PlatformServices by demo.platform {
+                override fun scriptSettings(data: ByteArray, sig: ByteArray, pubkeyHex: String, valuesJson: String, lang: String) =
+                    """{"ok":true,"name":"my-transport","html":"<html></html>","params":[{"key":"token","label":"T","type":"secret"}]}"""
+            }
+            class FakePage : BrowserPage
+            val host = object : io.openflux.desktop.service.SettingsPageHost {
+                override suspend fun open(html: String, onStep: (String) -> Unit, onSubmit: (String) -> Unit): BrowserPage = FakePage()
+                override fun close(page: BrowserPage) {}
+            }
+            val views = object : io.openflux.desktop.ui.BrowserViews {
+                @androidx.compose.runtime.Composable
+                override fun Page(page: BrowserPage, modifier: androidx.compose.ui.Modifier) {
+                    androidx.compose.foundation.layout.Box(
+                        modifier.background(androidx.compose.ui.graphics.Color.White).testTag("page"),
+                        contentAlignment = androidx.compose.ui.Alignment.Center,
+                    ) { androidx.compose.foundation.text.BasicText("страница настроек транспорта") }
+                }
+            }
+            val container = AppContainer(
+                demo.profiles, demo.settings, demo.connection, platformServices, demo.codec, DemoNode(demo.codec), DemoPhp(),
+                scripts = repo, settingsPageHost = host,
+            )
+            val width = if (desktop) 1100f else 412f
+            val height = 900f
+            runSkikoComposeUiTest(size = Size(width, height), density = Density(1f)) {
+                setContent {
+                    io.openflux.desktop.ui.theme.OpenFluxTheme(dark = desktop, touch = !desktop) {
+                        androidx.compose.runtime.CompositionLocalProvider(
+                            io.openflux.desktop.ui.LocalTouchUi provides !desktop,
+                            io.openflux.desktop.service.LocalAppContainer provides container,
+                            io.openflux.desktop.ui.LocalBrowserViews provides views,
+                            io.openflux.desktop.ui.components.LocalToaster provides io.openflux.desktop.ui.components.Toaster(),
+                            io.openflux.desktop.ui.LocalScrollbars provides NoScrollbars,
+                        ) {
+                            androidx.compose.foundation.layout.Box(
+                                androidx.compose.ui.Modifier.fillMaxSize().background(io.openflux.desktop.ui.theme.AppTheme.colors.background),
+                            ) { io.openflux.desktop.ui.shell.ScriptSettingsDialog() }
+                        }
+                    }
+                }
+                container.scriptSettings.open("my-transport", emptyMap()) {}
+                waitUntil(timeoutMillis = 10_000) { onAllNodesWithTag("page").fetchSemanticsNodes().isNotEmpty() }
+                val page = onNodeWithTag("page").getBoundsInRoot()
+                val w = (page.right - page.left).value
+                val h = (page.bottom - page.top).value
+                assertTrue(w >= width * 0.9f, "$platform: the settings page is $w dp wide in a $width dp window")
+                assertTrue(h >= height * 0.75f, "$platform: the settings page is $h dp high in a $height dp window")
+                out?.let { ImageIO.write(captureToImage().toAwtImage(), "png", File(it, "settings-${platform.name.lowercase()}.png")) }
             }
         }
     }
