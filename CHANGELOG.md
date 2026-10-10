@@ -5,6 +5,25 @@ All notable changes to OpenFluxDesktop. Format loosely follows
 
 ## [Unreleased]
 
+## [2.3.3] - 2026-10-11
+
+Hotfix: the core 0.4.3 — the Yandex and Mail.ru carriers.
+
+### Fixed
+
+- **Yandex: the carrier relays tunnel packets again.** The outgoing cursor message declared a fixed
+  length of `18` before its payload, but Yandex Disk does not relay a cursor whose declared length does
+  not match the packet, so every tunnel packet was dropped and the Session handshake timed out. The real
+  packet length is sent now (core 0.4.3, `OpenFlux` bumped to
+  [`d7105bd`](https://github.com/p1neappleXpress/OpenFlux/commit/d7105bd)). Reported by @Gamazzz
+  ([OpenFlux#165](https://github.com/p1neappleXpress/OpenFlux/issues/165)) — thank you.
+- **Mail.ru Docs: the carrier comes up on public links again.** Mail.ru's nginx answered `409 Conflict`
+  to the WebSocket upgrade, so the transport never connected; it now offers `permessage-deflate` and uses
+  a current Firefox `User-Agent`. Reported by @pirsasha
+  ([OpenFlux#163](https://github.com/p1neappleXpress/OpenFlux/issues/163)) and @Shiller70
+  ([OpenFlux#164](https://github.com/p1neappleXpress/OpenFlux/issues/164)) — thank you. Exit nodes on a
+  VDS need the same core: «Своя нода» installs `node-v1.2.3`.
+
 ## [2.3.2] - 2026-10-07
 
 Hotfix: the core 0.4.2.
