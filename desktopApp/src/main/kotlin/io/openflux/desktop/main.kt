@@ -7,19 +7,24 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.window.Notification
 import androidx.compose.ui.window.Tray
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowState
 import androidx.compose.ui.window.application
+import androidx.compose.ui.window.rememberTrayState
 import io.openflux.desktop.data.AppDirs
 import io.openflux.desktop.model.isActive
 import io.openflux.desktop.model.profile
 import io.openflux.desktop.platform.RELAUNCHED_ARG
-import io.openflux.desktop.ui.DesktopScrollbars
-import io.openflux.desktop.ui.Shortcuts
-import io.openflux.desktop.ui.components.AppIcons
-import io.openflux.desktop.ui.home.HomeTab
-import io.openflux.desktop.ui.shell.OpenFluxApp
+import io.openflux.app.account.AccountNotifier
+import io.openflux.app.platform.DesktopScrollbars
+import io.openflux.app.platform.Shortcuts
+import io.openflux.app.shell.OpenFluxApp
+import io.openflux.app.shell.connectChosen
+import io.openflux.app.shell.stopConnection
+import io.openflux.desktop.resources.Res
+import io.openflux.desktop.resources.ic_openflux_foreground
 import io.openflux.desktop.web.KcefBrowserViews
 import org.jetbrains.compose.resources.painterResource
 import java.awt.Dimension
@@ -27,7 +32,9 @@ import java.io.RandomAccessFile
 import java.nio.channels.FileLock
 import java.util.concurrent.atomic.AtomicBoolean
 import javax.swing.JOptionPane
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.collectLatest
 import kotlin.system.exitProcess
 
@@ -63,6 +70,9 @@ fun main(args: Array<String>) {
     // The core and the Windows proxy must not outlive the app, even on logoff or a kill from the task manager.
     Runtime.getRuntime().addShutdownHook(Thread({ stop() }, "openflux-shutdown"))
 
+    // What the bot used to send as messages (the end of the subscription, a paused connection, a payment) the app
+    // says by itself, through the tray.
+    val notifier = AccountNotifier(container.bot.state, container.bot::setNoticed, System::currentTimeMillis) { container.platform.utcOffsetSeconds }
     val shortcuts = Shortcuts()
     application(exitProcessOnExit = true) {
         val settings by container.settings.settings.collectAsState()
@@ -88,20 +98,27 @@ fun main(args: Array<String>) {
         }
 
         LaunchedEffect(Unit) {
-            if (settings.autoConnect) HomeTab.connectSelected(container)
+            if (settings.autoConnect) connectChosen(container)
         }
 
-        val icon = painterResource(AppIcons.Logo)
+        val trayState = rememberTrayState()
+        LaunchedEffect(Unit) {
+            // The tray listens first: a notice said before anyone listens would be lost, yet kept as said.
+            launch(start = CoroutineStart.UNDISPATCHED) { notifier.notices.collect { trayState.sendNotification(Notification(it.title, it.text, Notification.Type.Info)) } }
+            notifier.start(this)
+        }
+        val icon = painterResource(Res.drawable.ic_openflux_foreground)
         Tray(
+            state = trayState,
             icon = icon,
             tooltip = if (state.isActive) "OpenFlux — ${state.profile?.name ?: "подключено"}" else "OpenFlux — отключено",
             onAction = { visible = true },
             menu = {
                 Item("Открыть OpenFlux", onClick = { visible = true })
                 if (state.isActive) {
-                    Item("Отключить", onClick = { container.connection.disconnect() })
+                    Item("Отключить", onClick = { stopConnection(container) })
                 } else {
-                    Item("Подключить", onClick = { HomeTab.connectSelected(container) })
+                    Item("Подключить", onClick = { connectChosen(container) })
                 }
                 Separator()
                 Item("Выход", onClick = quit)

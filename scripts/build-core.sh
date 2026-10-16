@@ -16,6 +16,18 @@ root=$(cd "$(dirname "$0")/.." && pwd)
 core=$(cd "${1:-$root/OpenFlux}" && pwd)
 image=${2:-golang:$(sed -n 's/^go \([0-9.]*\).*/\1/p' "$core/go.mod" | head -n1)}
 
+# The submodule must be on the commit this repository pins: a `checkout main` inside it once rolled the bundled
+# core back to node-v1.0.0. CORE_UNPINNED=1 builds whatever is checked out.
+if [ -z "${1:-}" ] && [ -z "${CORE_UNPINNED:-}" ]; then
+  pinned=$(git -C "$root" ls-tree HEAD OpenFlux | awk '$2 == "commit" {print $3}')
+  head=$(git -C "$core" rev-parse HEAD)
+  if [ -n "$pinned" ] && [ "$pinned" != "$head" ]; then
+    echo "OpenFlux/ is on ${head:0:7}, but this repository pins ${pinned:0:7}." >&2
+    echo "Run: git submodule update --init OpenFlux   (or CORE_UNPINNED=1 to build it anyway)" >&2
+    exit 1
+  fi
+fi
+
 host_os() {
   case "$(uname -s)" in
     MINGW*|MSYS*|CYGWIN*) echo windows ;;

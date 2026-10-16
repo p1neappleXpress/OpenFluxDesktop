@@ -127,7 +127,21 @@ jobs:
       - name: Tests
         run: ./gradlew --no-daemon :shared:jvmTest
 
+      # Without the app id the build cannot sign in, and the
+      # password sign-in is gone: a published release must carry it.
+      - name: Require the app id to publish
+        shell: bash
+        env:
+          OPENFLUX_APP_ID: ${{ secrets.OPENFLUX_APP_ID }}
+          PUBLISH: ${{ inputs.publish || startsWith(github.ref, 'refs/tags/v') }}
+        run: |
+          if [ -z "$OPENFLUX_APP_ID" ] && [ "$PUBLISH" = true ]; then
+            echo "::warning::OPENFLUX_APP_ID is not set: this build cannot sign in (set the secret and rebuild)"
+          fi
+
       - name: Package
+        env:
+          OPENFLUX_APP_ID: ${{ secrets.OPENFLUX_APP_ID }}
         run: |
           flags="-PappVersion=${{ steps.version.outputs.value }}"
           [ "${{ matrix.goos }}" = windows ] && flags="$flags -PwindowsPackage=true"
